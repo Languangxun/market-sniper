@@ -149,4 +149,6 @@ market-sniper/
 
 ## License
 
+[MIT](LICENSE) © 2026 Languangxun
+
 仅供研究学习，不构成投资建议。
