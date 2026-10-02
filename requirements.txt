@@ -1,0 +1,10 @@
+# market-sniper runtime deps
+ccxt>=4.5
+yfinance>=0.2
+pandas>=2.0
+numpy>=1.24
+requests>=2.31
+PyQt6>=6.6
+pyqtgraph>=0.13
+curl_cffi>=0.7
+websockets>=14
