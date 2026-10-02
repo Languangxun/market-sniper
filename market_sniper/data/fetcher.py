@@ -19,7 +19,7 @@ import time
 
 from market_sniper import symbols as sym
 from market_sniper.data import db
-from market_sniper.data.sources import ccxt_crypto, yfinance_us, tencent_cn
+from market_sniper.data.sources import ccxt_crypto, yfinance_us
 
 _cc = ccxt_crypto
 
@@ -63,7 +63,6 @@ DEFAULT_UNIVERSE = {
         ("UNI/USDT", "Uniswap"), ("APT/USDT", "Aptos"),
         ("ARB/USDT", "Arbitrum"), ("OP/USDT", "Optimism"),
     ],
-    "CN": [],   # CN 候选池默认空（v0.1 暂不接 NASDAQ，专注 HK/US/CV）
 }
 
 # 修复 US 池 typo
@@ -101,22 +100,15 @@ def _route_daily(code: str, market: str, *, period: str = "max",
         until = _cc.dt_to_ms(end) if end else None
         return _cc.fetch_ohlcv_range(code, timeframe="1d",
                                      since_ms=since, until_ms=until)
-    if market == "CN":
-        return tencent_cn.fetch_daily(code, period=period,
-                                       start=start, end=end)
     raise ValueError(f"unknown market: {market}")
 
 
 def _route_minute(code: str, market: str, *, interval: str, period: str):
-    if market in ("HK", "US", "CN"):
-        # yfinance 分钟K
-        if market == "HK":
-            return yfinance_us.fetch_minute(sym.yf_symbol(f"HK:{code}"),
-                                             interval=interval, period=period)
-        if market == "US":
-            return yfinance_us.fetch_minute(code, interval=interval, period=period)
-        if market == "CN":
-            return tencent_cn.fetch_minute(code, interval=interval, period=period)
+    if market == "HK":
+        return yfinance_us.fetch_minute(sym.yf_symbol(f"HK:{code}"),
+                                         interval=interval, period=period)
+    if market == "US":
+        return yfinance_us.fetch_minute(code, interval=interval, period=period)
     if market == "CRYPTO":
         # yfinance minute bar 默认 '7d'；crypto 给 1000 根即可（约 16.7 小时）
         return _cc.fetch_ohlcv(code, timeframe=interval, limit=1000)
@@ -124,13 +116,10 @@ def _route_minute(code: str, market: str, *, interval: str, period: str):
 
 
 def _route_quote(code: str, market: str):
-    if market in ("HK", "US", "CN"):
-        if market == "HK":
-            return yfinance_us.fetch_quote(sym.yf_symbol(f"HK:{code}"))
-        if market == "US":
-            return yfinance_us.fetch_quote(code)
-        if market == "CN":
-            return tencent_cn.fetch_quote(code)
+    if market == "HK":
+        return yfinance_us.fetch_quote(sym.yf_symbol(f"HK:{code}"))
+    if market == "US":
+        return yfinance_us.fetch_quote(code)
     if market == "CRYPTO":
         ex = _cc.get_ex(_cc.exchange_order()[0])
         t = ex.fetch_ticker(code)
@@ -242,8 +231,6 @@ def ensure_stocks(market: str):
             db.upsert_stock(m, code, name=name, exchange="HKEX")
         elif m == "US":
             db.upsert_stock(m, code, name=name, exchange="NASDAQ/NYSE/AMEX")
-        elif m == "CN":
-            db.upsert_stock(m, code, name=name, exchange="SSE/SZSE")
 
 
 if __name__ == "__main__":

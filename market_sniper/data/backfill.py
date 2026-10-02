@@ -24,7 +24,7 @@ log = logging.getLogger("market_sniper.backfill")
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="回填行情")
-    p.add_argument("--market", choices=("CN", "HK", "US", "CRYPTO"),
+    p.add_argument("--market", choices=("HK", "US", "CRYPTO"),
                    help="限定市场")
     p.add_argument("--symbols", help="逗号分隔的本地代码（HK:00700,US:AAPL）")
     p.add_argument("--days", type=int, help="拉最近 N 天日K")

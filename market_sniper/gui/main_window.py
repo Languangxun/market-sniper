@@ -103,7 +103,7 @@ class FetchWorker(QtCore.QObject):
 
 # ---------------- 主窗口 ----------------
 class MainWindow(QtWidgets.QMainWindow):
-    MARKETS = ["HK", "US", "CRYPTO"]   # 默认隐藏 CN
+    MARKETS = ["HK", "US", "CRYPTO"]
     TIMEFRAMES = [("ts", "分时"), ("1m", "1分"), ("5m", "5分"),
                   ("15m", "15分"), ("30m", "30分"), ("60m", "60分"),
                   ("1d", "日K")]

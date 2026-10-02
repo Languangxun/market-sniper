@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""yfinance 数据源：US / HK / CN 共用。
+"""yfinance 数据源：US / HK 共用。
 
 直接走 Yahoo Finance v8 chart endpoint（curl 形态），不依赖 yfinance 的
 Ticker.info / quoteSummary（对部分 HK 标的会 404）。这层只负责：

@@ -1,6 +1,6 @@
 # market-sniper
 
-> 港 / 美 / 加密 / A股 短线研究工具：多市场 K 线统一查看 + 向量化指标 + PyQt6 桌面 GUI。
+> 港 / 美 / 加密 短线研究工具：多市场 K 线统一查看 + 向量化指标 + PyQt6 桌面 GUI。
 > 
 > 主题、布局（顶部工具栏 / 暗色密集三联图 / 五大指数条 / 底部日志）参考 stock_predict。
 
@@ -8,7 +8,7 @@
 
 ## 功能
 
-- **四市场统一**：HK 港股 / US 美股 / CRYPTO 加密 / CN A股
+- **三市场统一**：HK 港股 / US 美股 / CRYPTO 加密
 - **多周期**：日 K + 1m/5m/15m/30m/1h 分钟K
 - **指标**（TDX 口径 numpy 向量化）：
   - MA / EMA / BOLL / MACD / KDJ / RSI / ATR
@@ -29,7 +29,6 @@
 | HK       | yfinance | yfinance | `HK:00700` |
 | US       | yfinance | yfinance | `US:AAPL` |
 | CRYPTO   | ccxt (Binance/OKX/Bybit) | ccxt | `CRYPTO:BTC/USDT` |
-| CN       | yfinance (SH/SZ) | yfinance | `CN:sh600000` |
 
 - yfinance 通过直接调用 Yahoo Finance v8 chart endpoint 实现（绕开 yfinance Ticker
   触发 quoteSummary 404 的问题，参考 [yfinance](https://github.com/ranaroussi/yfinance)
@@ -106,7 +105,7 @@ market-sniper/
 ├── run.sh                 # 桌面快捷方式指向的启动脚本
 ├── market_sniper/
 │   ├── __init__.py
-│   ├── symbols.py         # 四市场代码互转
+│   ├── symbols.py         # 三市场代码互转
 │   ├── indicators.py      # TDX 风格向量化指标
 │   ├── data/
 │   │   ├── db.py          # SQLite schema + load/upsert
@@ -115,8 +114,7 @@ market-sniper/
 │   │   ├── backfill.py    # CLI 回填
 │   │   └── sources/
 │   │       ├── yfinance_us.py   # yahoo chart endpoint
-│   │       ├── ccxt_crypto.py   # ccxt multi-exchange
-│   │       └── tencent_cn.py    # A 股（包装 yfinance）
+│   │       └── ccxt_crypto.py   # ccxt multi-exchange
 │   └── gui/
 │       ├── kline_widget.py      # PyQtGraph 蜡烛 + 副图
 │       └── main_window.py       # 主窗口
@@ -143,9 +141,8 @@ market-sniper/
 - **历史分钟 K**：
   - yfinance 1m 限 7 天，5m/15m/30m 限 60 天，1h 限 730 天
   - ccxt（Binance）历史分钟 K 完整，但需分页拉取，量大时慢
-- **A 股**：暂用 yfinance 拉 SH/SZ，BJ 北交所尚未支持
-- **数据准确性**：yfinance 数据有 15 分钟延迟（非 pro 账户）；A 股不复权
-- **复权**：A 股暂未实现复权因子（todo v0.2 接 stock_predict 的新浪复权思路）
+- **数据准确性**：yfinance 数据有 15 分钟延迟（非 pro 账户）
+- **A 股**：不支持（如需可参考 stock_predict 的腾讯/新浪源自行扩展）
 
 ## License
 

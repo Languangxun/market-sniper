@@ -1,16 +1,17 @@
 # -*- coding: utf-8 -*-
 """SQLite 数据层：统一表 `daily_bars(market, symbol, ...)`。
 
-`local` 字段 = `market:symbol`（如 HK:00700 / US:AAPL / CRYPTO:BTC/USDT / CN:sh600000）。
+`local` 字段 = `market:symbol`（如 HK:00700 / US:AAPL / CRYPTO:BTC/USDT）。
 
 表：
     stocks        元信息（market, code, name, exchange, listed, delisted）
     daily_bars    日K  (market, code, date, o/h/l/c, vol, amount)  UNIQUE(market,code,date)
     min_bars      分钟K(market, code, timeframe, ts, o/h/l/c, vol)  UNIQUE(market,code,timeframe,ts)
+    ticks         逐笔(market, code, ts_ms, price, qty, side, source)
     meta          配置缓存 (key, value, ts)
 
 约定：
-    daily_bars.volume / amount 单位与源一致（crypto 成交量用基础币，A股用手）；
+    daily_bars.volume / amount 单位与源一致（crypto 成交量用基础币）；
     min_bars.volume 同源；timeframe 取 '1m' / '5m' / '15m' / '30m' / '60m'。
 """
 from __future__ import annotations
@@ -404,7 +405,7 @@ def get_meta(key: str) -> str | None:
 def health() -> dict:
     conn = _cx()
     out = {"ts": DateTime_now()}
-    for mkt in ("CN", "HK", "US", "CRYPTO"):
+    for mkt in ("HK", "US", "CRYPTO"):
         s = conn.execute(
             "SELECT COUNT(*) FROM stocks WHERE market=?", (mkt,)
         ).fetchone()[0]

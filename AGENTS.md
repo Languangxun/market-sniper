@@ -2,7 +2,8 @@
 
 ## 项目约定
 
-- 数据层四市场统一以 `MARKET:CODE` 形态存：`HK:00700` / `US:AAPL` / `CRYPTO:BTC/USDT` / `CN:sh600000`。
+- 数据层三市场统一以 `MARKET:CODE` 形态存：`HK:00700` / `US:AAPL` / `CRYPTO:BTC/USDT`。
+  不支持 A股（CN 已移除，源码/文档不要加回来）。
 - 日 K 走 `daily_bars(market, code, date, OHLCV, source)`；分钟 K 走 `min_bars(market, code, timeframe, ts, OHLCV, source)`。
 - 新增数据源需：
   - 实现 `fetch_daily(code, ...)` 与 `fetch_minute(code, timeframe, ...)`，返回 `[{ts(ISO), ohlcv, ...}, ...]`
