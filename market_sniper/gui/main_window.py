@@ -144,6 +144,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.config = config_mod.get_config()
         self._engine = None
         self._engine_signals: list[dict] = []
+        self._chart_signals: list[dict] = []
 
         self._build_toolbar()
         self._build_info_row()
@@ -401,6 +402,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_live.setToolTip("启动/停止实时行情引擎（数据源见设置）")
         self.btn_live.toggled.connect(self._on_live_toggle)
         tb.addWidget(self.btn_live)
+
+        self.btn_sig = QtWidgets.QToolButton()
+        self.btn_sig.setText("⚡ 信号")
+        self.btn_sig.setCheckable(True)
+        self.btn_sig.setToolTip("在当前图表上计算买卖点（算法见 ⚙ 设置 → 策略）")
+        self.btn_sig.toggled.connect(self._on_sig_toggle)
+        tb.addWidget(self.btn_sig)
 
     # ---------------- 信息行（股票信息 / 进度 / hover） ----------------
     def _build_info_row(self):
@@ -926,6 +934,29 @@ class MainWindow(QtWidgets.QMainWindow):
             self.sb_feed.setText("实时: ○ 停止")
             self.sb_feed.setStyleSheet(f"color:{AXIS_C};")
 
+    def _on_sig_toggle(self, checked: bool):
+        if not checked:
+            self._chart_signals = []
+            self._apply_markers()
+            return
+        if getattr(self, "_last_bars", None):
+            self._compute_chart_signals()
+        self._apply_markers()
+
+    def _compute_chart_signals(self):
+        """对当前图表数据跑信号算法（进程内快路径优先，未注册则转发 compute/）。"""
+        from market_sniper import compute as compute_mod
+        algo = self.config.get("ui.signal_algo", "boll_atr")
+        try:
+            out = compute_mod.compute_signals(algo, self._last_bars,
+                                              self._current_market)
+            self._chart_signals = out.get("signals", [])
+            self._log(f"信号[{algo}] {len(self._chart_signals)} 个"
+                      f" · 末仓 {out.get('position', '-')}")
+        except Exception as e:
+            self._chart_signals = []
+            self._log(f"信号计算失败[{algo}]: {e}")
+
     def _apply_markers(self):
         bars = getattr(self, "_last_bars", None)
         if not bars or not self.config.get("ui.show_markers", True):
@@ -934,10 +965,16 @@ class MainWindow(QtWidgets.QMainWindow):
         ts_list = bars.get("dates") or bars.get("ts") or []
         ms_list = [self._parse_ts_ms(t) for t in ts_list]
         local = f"{self._current_market}:{self._current_code}"
+        seen: set[tuple] = set()
         out = []
-        for s in self._engine_signals:
-            if s.get("local") != local:
+        # 图表信号（bar 对齐）+ 实时引擎信号（tick 对齐取前一根），合并去重
+        for s in self._chart_signals + self._engine_signals:
+            if s.get("local") not in (None, local):
                 continue
+            key = (s.get("ts_ms"), s.get("side"))
+            if key in seen:
+                continue
+            seen.add(key)
             idx = -1
             for i, ms in enumerate(ms_list):
                 if ms is None:
@@ -1086,6 +1123,8 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         self._last_bars = bars
         self.kline.set_data(data)
+        if self.btn_sig.isChecked():
+            self._compute_chart_signals()
         self._apply_markers()
         self._refresh_quote_box(ind, name)
         self._update_info()
@@ -1167,6 +1206,8 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         self.kline.set_data(data)
         self.kline.set_subplot(self._subplot)
+        if self.btn_sig.isChecked():
+            self._compute_chart_signals()
         self._apply_markers()
         self._refresh_quote_box(ind, name)
         self._update_info()

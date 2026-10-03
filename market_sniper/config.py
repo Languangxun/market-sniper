@@ -68,6 +68,7 @@ DEFAULTS: dict = {
         "default_market": "CRYPTO",
         "default_symbol": "BTC/USDT",
         "show_markers": True,
+        "signal_algo": "boll_atr",     # 图表买卖点算法（SIGNAL_ALGOS 或 compute/ 脚本）
     },
 }
 

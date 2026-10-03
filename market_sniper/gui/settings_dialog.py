@@ -132,7 +132,17 @@ class SettingsDialog(QtWidgets.QDialog):
         # ---- 策略 ----
         st_w = QtWidgets.QWidget()
         sv = QtWidgets.QVBoxLayout(st_w)
-        self.strategy_chk = QtWidgets.QCheckBox("启用策略")
+        form = QtWidgets.QFormLayout()
+        self.algo_combo = QtWidgets.QComboBox()
+        from market_sniper import signals as sig_mod
+        from market_sniper import compute as compute_mod
+        algos = list(sig_mod.SIGNAL_ALGOS) + [
+            s for s in compute_mod.list_scripts() if s not in sig_mod.SIGNAL_ALGOS]
+        for a in algos or ["boll_atr"]:
+            self.algo_combo.addItem(a, a)
+        form.addRow("图表信号算法", self.algo_combo)
+        sv.addLayout(form)
+        self.strategy_chk = QtWidgets.QCheckBox("实时引擎启用策略（逐笔失衡示例）")
         sv.addWidget(self.strategy_chk)
         hint = QtWidgets.QLabel(
             "策略参数（JSON）。算法在 market_sniper/engine/strategy.py 的\n"
@@ -181,6 +191,8 @@ class SettingsDialog(QtWidgets.QDialog):
         self.flush_spin.setValue(int(c.get("feed.flush_ms", 1000)))
         self.reconnect_spin.setValue(int(c.get("feed.reconnect_max_sec", 30)))
         self.markers_chk.setChecked(bool(c.get("ui.show_markers", True)))
+        idx = self.algo_combo.findData(c.get("ui.signal_algo", "boll_atr"))
+        self.algo_combo.setCurrentIndex(max(0, idx))
         self.autobf_chk.setChecked(bool(c.get("backfill.on_start", True)))
         self.api_port_spin.setValue(int(c.get("api.port", 7132)))
 
@@ -242,6 +254,7 @@ class SettingsDialog(QtWidgets.QDialog):
             },
             "ui": {
                 "show_markers": self.markers_chk.isChecked(),
+                "signal_algo": self.algo_combo.currentData(),
             },
             "backfill": {
                 "on_start": self.autobf_chk.isChecked(),

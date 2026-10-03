@@ -6,13 +6,13 @@
 
 ## 适配网站
 
-| 网站 | 标的识别 | 示例 URL |
-|---|---|---|
-| TradingView | URL `?symbol=` 参数 | `tradingview.com/chart/?symbol=NASDAQ%3AAAPL` |
-| Binance | `/trade/BTC_USDT` | `binance.com/zh-CN/trade/BTC_USDT` |
-| Yahoo 财经 | `/quote/AAPL` | `finance.yahoo.com/quote/0700.HK` |
-| 雪球 | `/S/00700` | `xueqiu.com/S/00700` |
-| 长桥证券 | `/stock/00700-HK`、`/trade/HK.00700` | `longbridgeapp.com/stock/AAPL-US` |
+| 网站          | 标的识别                                | 示例 URL                                        |
+| ----------- | ----------------------------------- | --------------------------------------------- |
+| TradingView | URL `?symbol=` 参数                   | `tradingview.com/chart/?symbol=NASDAQ%3AAAPL` |
+| Binance     | `/trade/BTC_USDT`                   | `binance.com/zh-CN/trade/BTC_USDT`            |
+| Yahoo 财经    | `/quote/AAPL`                       | `finance.yahoo.com/quote/0700.HK`             |
+| 雪球          | `/S/00700`                          | `xueqiu.com/S/00700`                          |
+| 长桥证券        | `/stock/00700-HK`、`/trade/HK.00700` | `longbridgeapp.com/stock/AAPL-US`             |
 
 A股/新加坡（雪球 SH/SZ、长桥 -CN/-SG）不支持，会明确提示。
 

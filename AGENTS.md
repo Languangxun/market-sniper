@@ -16,6 +16,8 @@
 - **数据源可配置**：`config.sources.{HK,US,CRYPTO}`（设置面板可选）；CRYPTO 走 `ccxt_crypto.exchange_order()` 动态优先级，改完设置会 `reset_exchanges()/reset_session()` 热生效。
 - **设置统一走 `market_sniper/config.py`**（`get_config()` 单例，落盘 `data/settings.json`）；GUI 面板在 `gui/settings_dialog.py`，新增可配置项需同时改 `config.DEFAULTS` 和面板 `_load()/_collect()`。
 - **实时链路**：`data/stream.py`(Feed) → `engine/runner.py`(LiveEngine) → `engine/strategy.py`(Strategy 返回 `Signal`) → GUI `_sig_engine_signal` → `kline_widget.set_markers()`。feed 回调内禁止写 SQLite，tick 落盘走 `ticks` 表 + `LiveEngine` 批量 writer。
+- **图表 BS 点**：工具栏「⚡ 信号」对当前图表跑 `compute.compute_signals`（算法 `ui.signal_algo`，
+  设置面板可选），与引擎实时信号在 `_apply_markers` 合并去重后画 marker。
 - 代理不再硬编码：`network.*` 由 config 读取，`ccxt_crypto.reset_exchanges()` / `yfinance_us.reset_session()` 可在设置保存后热重置。
 - **本地 API**：`market_sniper/api.py` 随 GUI 启动（端口 `config.api.port`，默认 7132，仅绑 127.0.0.1）；
   `/api/signal` 的算法在 `signals.SIGNAL_ALGOS` 注册（同签名函数），默认 `boll_atr` 示例；
