@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import datetime
+import logging
 import sys
 import threading
 import time
@@ -23,10 +24,12 @@ from market_sniper import config as config_mod
 from market_sniper import indicators as ind_mod
 from market_sniper.data import db as dbmod
 from market_sniper.data import fetcher
+from market_sniper.gui.backfill_dialog import BackfillDialog
 from market_sniper.gui.kline_widget import (
     KlineWidget, KlineData, SUBPLOT_TYPES,
 )
 from market_sniper.gui.settings_dialog import SettingsDialog
+from market_sniper.signals import ACTION_META, action_label
 
 # ---------------- 主题色（高对比：对齐 stock_predict THEMES["contrast"]） ----------------
 BG          = "#000000"
@@ -162,6 +165,51 @@ class MainWindow(QtWidgets.QMainWindow):
         self._refresh_watchlist()
         self._set_intraday_controls()
         self._after_symbol_changed()
+
+        # 本地 API（浏览器插件用）
+        self._api_port = None
+        try:
+            from market_sniper import api as api_mod
+            self._api_port = api_mod.start()
+            self.sb_api.setText(f"API 127.0.0.1:{self._api_port}"
+                                if self._api_port else "API ✗ 端口占用")
+        except Exception as e:
+            self.sb_api.setText("API ✗")
+            self._log(f"API 启动失败: {e}")
+
+        # 启动时后台自动补齐新数据
+        if self.config.get("backfill.on_start", True):
+            threading.Thread(target=self._auto_backfill, daemon=True,
+                             name="auto-backfill").start()
+
+    def _auto_backfill(self):
+        """启动后台增量补齐：日K接续 + 各档分钟K刷最近窗口。"""
+        try:
+            days = int(self.config.get("backfill.days", 30))
+            tfs = self.config.get("backfill.timeframes") or \
+                ["1m", "5m", "15m", "30m", "60m"]
+            self._sig_log.emit("后台自动补齐新数据…")
+            n = 0
+            for m in ("HK", "US", "CRYPTO"):
+                for code, _ in fetcher.universes(m):
+                    local = f"{m}:{code}"
+                    try:
+                        n += fetcher.backfill_daily(local, days=days)
+                    except Exception as e:
+                        self._sig_log.emit(f"  自动补齐 {local} 日K失败: {e}")
+                    time.sleep(0.15)
+                    for tf in tfs:
+                        try:
+                            n += fetcher.backfill_minute(local, timeframe=tf,
+                                                         period="7d")
+                        except Exception:
+                            pass
+                        time.sleep(0.15)
+            self._sig_log.emit(f"后台自动补齐完成（+{n} 根）")
+            self._sig_backfill_done.emit(f"自动补齐完成 +{n} 根")
+        except Exception:
+            log = logging.getLogger("market_sniper.gui")
+            log.exception("自动补齐线程异常")
 
     # ---------------- 主题 ----------------
     def _qss(self) -> str:
@@ -570,6 +618,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.sb_feed = QtWidgets.QLabel("实时: ○ 停止")
         self.sb_feed.setStyleSheet(f"color:{AXIS_C};")
         self.sb.addPermanentWidget(self.sb_feed)
+        self.sb_api = QtWidgets.QLabel("API …")
+        self.sb_api.setStyleSheet(f"color:{AXIS_C};")
+        self.sb.addPermanentWidget(self.sb_api)
         self.sb_health = QtWidgets.QLabel("DB: -")
         self.sb.addPermanentWidget(self.sb_health)
 
@@ -724,32 +775,44 @@ class MainWindow(QtWidgets.QMainWindow):
         if self._backfill_busy:
             self._log("回填进行中，请稍候")
             return
+        dlg = BackfillDialog(current_market=self._current_market,
+                             current_code=self._current_code,
+                             timeframes=self.TIMEFRAMES,
+                             qss=self._qss(), parent=self)
+        if not dlg.exec():
+            return
+        codes = dlg.codes()
+        tf = dlg.timeframe()
+        bars = dlg.bars()
+        force = dlg.force()
         market = self._current_market
-        tf = self._current_timeframe
-        if tf == "ts":
-            tf = "1m"
         self._backfill_busy = True
         self.btn_backfill.setEnabled(False)
 
         def work():
             try:
-                if tf == "1d":
-                    syms = fetcher.universes(market)
-                    self._sig_log.emit(f"开始回填 {market} {len(syms)} 标的 最近 120 天日K…")
-                    n_ok = n_fail = 0
-                    for code, _ in syms:
-                        try:
-                            fetcher.backfill_daily(f"{market}:{code}", days=120)
-                            n_ok += 1
-                        except Exception as e:
-                            n_fail += 1
-                            self._sig_log.emit(f"  {market}:{code} 失败: {e}")
-                    summary = f"回填完成 {market}：{n_ok} 成功 / {n_fail} 失败"
+                if codes:
+                    targets = codes
                 else:
-                    self._sig_log.emit(f"回填 {market}:{self._current_code} {tf}…")
-                    fetcher.backfill_minute(f"{market}:{self._current_code}",
-                                            timeframe=tf, period="7d")
-                    summary = f"回填完成 {market}:{self._current_code} {tf}"
+                    targets = [f"{market}:{c}" for c, _ in fetcher.universes(market)]
+                self._sig_log.emit(
+                    f"开始回填 {len(targets)} 标的 · {self._tf_label(tf)} × {bars} 根…")
+                n_ok = n_fail = n_rows = 0
+                for local in targets:
+                    try:
+                        if tf == "1d":
+                            n_rows += fetcher.backfill_daily(local, days=bars,
+                                                             force=force)
+                        else:
+                            n_rows += fetcher.backfill_minute(local, timeframe=tf,
+                                                              bars=bars)
+                        n_ok += 1
+                        self._sig_log.emit(f"  ✓ {local}")
+                    except Exception as e:
+                        n_fail += 1
+                        self._sig_log.emit(f"  ✗ {local}: {e}")
+                summary = (f"回填完成：{n_ok} 成功 / {n_fail} 失败，"
+                           f"共 +{n_rows} 根")
             except Exception as e:
                 summary = f"回填失败: {e}"
             self._sig_backfill_done.emit(summary)
@@ -775,6 +838,17 @@ class MainWindow(QtWidgets.QMainWindow):
             yfinance_us.reset_session()
         except Exception:
             pass
+        # API 端口变了就热重启
+        try:
+            from market_sniper import api as api_mod
+            port = int(self.config.get("api.port", 7132))
+            if port != self._api_port:
+                api_mod.stop()
+                self._api_port = api_mod.start(port)
+                self.sb_api.setText(f"API 127.0.0.1:{self._api_port}"
+                                    if self._api_port else "API ✗ 端口占用")
+        except Exception as e:
+            self._log(f"API 重启失败: {e}")
         if self._engine is not None and self._engine.running:
             self._log("重启实时引擎以应用新设置…")
             self.btn_live.setChecked(False)
@@ -833,7 +907,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self._engine_signals.append(d)
         if len(self._engine_signals) > 500:
             self._engine_signals = self._engine_signals[-500:]
-        self._log(f"⚡ {d['side'].upper()} {d['local']} @ {d['price']:.4f}"
+        meta = ACTION_META.get(d.get("side"), {})
+        self._log(f"⚡ {meta.get('label', d.get('side', '?'))} "
+                  f"{d['local']} @ {d['price']:.4f}"
                   f" · {d.get('strategy', '')} {d.get('reason', '')}")
         self._apply_markers()
 
@@ -871,7 +947,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 else:
                     break
             if idx >= 0:
-                out.append({"index": idx, "price": s["price"], "side": s["side"]})
+                meta = ACTION_META.get(s.get("side"), {})
+                out.append({"index": idx, "price": s["price"],
+                            "side": meta.get("dir", "up"),
+                            "hollow": meta.get("hollow", False)})
         self.kline.set_markers(out[-200:])
 
     @staticmethod

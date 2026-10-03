@@ -371,7 +371,8 @@ class KlineWidget(QtWidgets.QWidget):
 
     # -------- 买卖点叠加 --------
     def set_markers(self, markers: list[dict] | None):
-        """markers = [{index, price, side('buy'/'sell'), text?}, ...]。"""
+        """markers = [{index, price, side, hollow?}, ...]。
+        side: 'up'(红,三角朝上) / 'down'(绿,三角朝下)；hollow=True 空心（平仓类）。"""
         self._markers = list(markers or [])
         self._draw_markers()
 
@@ -385,22 +386,28 @@ class KlineWidget(QtWidgets.QWidget):
         if not self._markers or not self._data:
             return
         n = len(self._data.closes)
-        buys = [(m["index"], m["price"]) for m in self._markers
-                if m.get("side") == "buy" and 0 <= m["index"] < n]
-        sells = [(m["index"], m["price"]) for m in self._markers
-                 if m.get("side") == "sell" and 0 <= m["index"] < n]
-        if buys:
-            it = pg.ScatterPlotItem(
-                x=[p[0] for p in buys], y=[p[1] for p in buys],
-                symbol="t1", size=12, pxMode=True,
-                brush=pg.mkBrush(UP_C), pen=pg.mkPen("#ffffff", width=0.6))
-            self.p1.addItem(it, ignoreBounds=True)
-            self._marker_items.append(it)
-        if sells:
-            it = pg.ScatterPlotItem(
-                x=[p[0] for p in sells], y=[p[1] for p in sells],
-                symbol="t", size=12, pxMode=True,
-                brush=pg.mkBrush(DOWN_C), pen=pg.mkPen("#ffffff", width=0.6))
+        groups: dict[tuple[str, bool], list[tuple[int, float]]] = {}
+        for m in self._markers:
+            side = m.get("side") or "up"
+            if 0 <= m.get("index", -1) < n:
+                groups.setdefault((side, bool(m.get("hollow"))), []).append(
+                    (m["index"], m["price"]))
+        for (side, hollow), pts in groups.items():
+            if not pts:
+                continue
+            x = [p[0] for p in pts]
+            y = [p[1] for p in pts]
+            color = UP_C if side == "up" else DOWN_C
+            if hollow:
+                it = pg.ScatterPlotItem(
+                    x=x, y=y, symbol="t1" if side == "up" else "t",
+                    size=12, pxMode=True,
+                    brush=pg.mkBrush(BG), pen=pg.mkPen(color, width=1.4))
+            else:
+                it = pg.ScatterPlotItem(
+                    x=x, y=y, symbol="t1" if side == "up" else "t",
+                    size=12, pxMode=True,
+                    brush=pg.mkBrush(color), pen=pg.mkPen("#ffffff", width=0.6))
             self.p1.addItem(it, ignoreBounds=True)
             self._marker_items.append(it)
 

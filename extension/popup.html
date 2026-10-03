@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { font: 12px/1.6 -apple-system,'Segoe UI','Microsoft YaHei',sans-serif;
+         width: 280px; margin: 0; padding: 12px;
+         background: #0a0a0a; color: #fff; }
+  h1 { font-size: 13px; margin: 0 0 10px; color: #ffee00; }
+  label { display: block; color: #8fa0ad; margin: 8px 0 2px; }
+  input, select { width: 100%; box-sizing: border-box; background: #111;
+                  color: #fff; border: 1px solid #fff; border-radius: 4px;
+                  padding: 5px 6px; }
+  .row { margin-top: 12px; display: flex; gap: 8px; align-items: center; }
+  button { flex: 1; background: #ffee00; color: #000; font-weight: 700;
+           border: 0; border-radius: 4px; padding: 6px; cursor: pointer; }
+  #status { margin-top: 8px; color: #8fa0ad; min-height: 16px; }
+  .chk { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+  .chk input { width: auto; }
+</style>
+</head>
+<body>
+  <h1>⚡ market-sniper</h1>
+
+  <div class="chk">
+    <input type="checkbox" id="enabled">
+    <span>在页面上显示买卖点</span>
+  </div>
+
+  <label>信号周期</label>
+  <select id="tf">
+    <option value="1d">日K</option>
+    <option value="60m">60分</option>
+    <option value="30m">30分</option>
+    <option value="15m">15分</option>
+    <option value="5m">5分</option>
+    <option value="1m">1分</option>
+  </select>
+
+  <label>本地程序地址</label>
+  <input id="server" type="text" placeholder="http://127.0.0.1:7132">
+
+  <div class="row">
+    <button id="save">保存</button>
+  </div>
+  <div id="status"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

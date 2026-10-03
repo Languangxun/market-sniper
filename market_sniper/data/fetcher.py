@@ -57,7 +57,7 @@ DEFAULT_UNIVERSE = {
         ("XRP/USDT", "XRP"), ("DOGE/USDT", "Dogecoin"),
         ("ADA/USDT", "Cardano"), ("AVAX/USDT", "Avalanche"),
         ("TRX/USDT", "TRON"), ("DOT/USDT", "Polkadot"),
-        ("LINK/USDT", "Chainlink"), ("MATIC/USDT", "Polygon"),
+        ("LINK/USDT", "Chainlink"), ("POL/USDT", "Polygon"),
         ("LTC/USDT", "Litecoin"), ("BCH/USDT", "Bitcoin Cash"),
         ("ATOM/USDT", "Cosmos"), ("ETC/USDT", "Ethereum Classic"),
         ("UNI/USDT", "Uniswap"), ("APT/USDT", "Aptos"),
@@ -81,12 +81,22 @@ def _resolve_universe(market: str) -> list[tuple[str, str]]:
 
 
 # ---------------- 路由 ----------------
+# Yahoo range=max 会降采样（MSFT 只回 ~164 根），max 必须走显式起止
+_MAX_START = "1970-01-01"
+
+
 def _route_daily(code: str, market: str, *, period: str = "max",
                  start: str | None = None, end: str | None = None):
     if market == "HK":
+        if not start and period == "max":
+            start = _MAX_START
+            end = datetime.date.today().strftime("%Y-%m-%d")
         return yfinance_us.fetch_daily(sym.yf_symbol(f"HK:{code}"),
                                        period=period, start=start, end=end)
     if market == "US":
+        if not start and period == "max":
+            start = _MAX_START
+            end = datetime.date.today().strftime("%Y-%m-%d")
         return yfinance_us.fetch_daily(code, period=period,
                                        start=start, end=end)
     if market == "CRYPTO":
@@ -185,12 +195,43 @@ def backfill_daily(local: str, *, days: int | None = None,
     return n
 
 
+def period_for_bars(timeframe: str, bars: int) -> str:
+    """按想要的根数近似映射 yfinance period（Yahoo 分钟K 只收固定档）。"""
+    tf = timeframe
+    if tf == "1m":
+        return "7d"                       # yfinance 1m 上限 7d
+    days = max(1, int(bars) // 60 + (1 if int(bars) % 60 else 0))
+    if tf in ("5m", "15m", "30m"):
+        for limit, p in ((1, "1d"), (5, "5d"), (30, "1mo"), (60, "60d")):
+            if days <= limit:
+                return p
+        return "60d"
+    if tf in ("60m", "1h"):
+        for limit, p in ((7, "7d"), (30, "1mo"), (90, "3mo"),
+                         (180, "6mo"), (365, "1y"), (730, "2y")):
+            if days <= limit:
+                return p
+        return "730d"
+    return "7d"
+
+
 def backfill_minute(local: str, *, timeframe: str = "1m",
-                    period: str = "7d") -> int:
-    """拉取并入库分钟K。1m 默认 7d。"""
+                    period: str = "7d", bars: int | None = None) -> int:
+    """拉取并入库分钟K。
+
+    period：yfinance 档位（'7d'/'60d'/'730d'...）。
+    bars：想要的目标根数——crypto 直接 limit=bars；yfinance 换算成最近档位。
+    """
     market, code = local.split(":", 1)
     market = market.upper()
-    rows = _route_minute(code, market, interval=timeframe, period=period)
+    if bars:
+        if market == "CRYPTO":
+            rows = _route_minute_bars_crypto(code, timeframe, bars)
+        else:
+            period = period_for_bars(timeframe, bars)
+            rows = _route_minute(code, market, interval=timeframe, period=period)
+    else:
+        rows = _route_minute(code, market, interval=timeframe, period=period)
     if not rows:
         log.info("%s 无分钟K线", local)
         return 0
@@ -199,6 +240,11 @@ def backfill_minute(local: str, *, timeframe: str = "1m",
                 datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     log.info("%s %s backfilled %d bars", local, timeframe, n)
     return n
+
+
+def _route_minute_bars_crypto(code: str, timeframe: str, bars: int) -> list[dict]:
+    tf = "1h" if timeframe == "60m" else timeframe
+    return _cc.fetch_ohlcv(code, timeframe=tf, limit=max(1, min(bars, 1000)))
 
 
 def universes(market: str) -> list[tuple[str, str]]:

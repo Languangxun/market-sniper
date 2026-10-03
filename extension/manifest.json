@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "market-sniper 买卖点",
+  "version": "0.1.0",
+  "description": "连接本地 market-sniper 桌面程序，在 TradingView / Binance / Yahoo财经 / 雪球 的K线页面上叠加买卖点（示例算法 BOLL+ATR）。",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "http://localhost/*",
+    "*://*.tradingview.com/*",
+    "*://*.binance.com/*",
+    "*://*.finance.yahoo.com/*",
+    "*://*.xueqiu.com/*",
+    "*://*.longbridgeapp.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.tradingview.com/*",
+        "*://*.binance.com/*",
+        "*://*.finance.yahoo.com/*",
+        "*://*.xueqiu.com/*",
+        "*://*.longbridgeapp.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "market-sniper 设置"
+  }
+}

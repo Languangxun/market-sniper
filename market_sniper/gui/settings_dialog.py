@@ -118,6 +118,15 @@ class SettingsDialog(QtWidgets.QDialog):
         ef.addRow("断线重连上限", self.reconnect_spin)
         self.markers_chk = QtWidgets.QCheckBox("在 K 线叠加买卖点")
         ef.addRow("", self.markers_chk)
+        sep = QtWidgets.QFrame()
+        sep.setFrameShape(QtWidgets.QFrame.Shape.HLine)
+        ef.addRow(sep)
+        self.autobf_chk = QtWidgets.QCheckBox("启动时后台自动补齐新数据")
+        ef.addRow("", self.autobf_chk)
+        self.api_port_spin = QtWidgets.QSpinBox()
+        self.api_port_spin.setRange(1024, 65535)
+        self.api_port_spin.setToolTip("浏览器插件读取买卖点的本地端口")
+        ef.addRow("本地 API 端口", self.api_port_spin)
         tabs.addTab(eng_w, "实时引擎")
 
         # ---- 策略 ----
@@ -172,6 +181,8 @@ class SettingsDialog(QtWidgets.QDialog):
         self.flush_spin.setValue(int(c.get("feed.flush_ms", 1000)))
         self.reconnect_spin.setValue(int(c.get("feed.reconnect_max_sec", 30)))
         self.markers_chk.setChecked(bool(c.get("ui.show_markers", True)))
+        self.autobf_chk.setChecked(bool(c.get("backfill.on_start", True)))
+        self.api_port_spin.setValue(int(c.get("api.port", 7132)))
 
         self.strategy_chk.setChecked(bool(c.get("strategy.enabled", False)))
         self.strategy_params.setPlainText(
@@ -231,6 +242,12 @@ class SettingsDialog(QtWidgets.QDialog):
             },
             "ui": {
                 "show_markers": self.markers_chk.isChecked(),
+            },
+            "backfill": {
+                "on_start": self.autobf_chk.isChecked(),
+            },
+            "api": {
+                "port": self.api_port_spin.value(),
             },
         }
 

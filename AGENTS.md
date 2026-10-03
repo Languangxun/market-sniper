@@ -17,6 +17,18 @@
 - **设置统一走 `market_sniper/config.py`**（`get_config()` 单例，落盘 `data/settings.json`）；GUI 面板在 `gui/settings_dialog.py`，新增可配置项需同时改 `config.DEFAULTS` 和面板 `_load()/_collect()`。
 - **实时链路**：`data/stream.py`(Feed) → `engine/runner.py`(LiveEngine) → `engine/strategy.py`(Strategy 返回 `Signal`) → GUI `_sig_engine_signal` → `kline_widget.set_markers()`。feed 回调内禁止写 SQLite，tick 落盘走 `ticks` 表 + `LiveEngine` 批量 writer。
 - 代理不再硬编码：`network.*` 由 config 读取，`ccxt_crypto.reset_exchanges()` / `yfinance_us.reset_session()` 可在设置保存后热重置。
+- **本地 API**：`market_sniper/api.py` 随 GUI 启动（端口 `config.api.port`，默认 7132，仅绑 127.0.0.1）；
+  `/api/signal` 的算法在 `signals.SIGNAL_ALGOS` 注册（同签名函数），默认 `boll_atr` 示例；
+  `/api/backtest` 走计算转发层。
+- **计算转发层**：`market_sniper/compute.py` 把重计算转发给 `compute/` 目录的自包含脚本
+  （stdin/stdout JSON、不 import 主程序、Linux 优先，可执行位走 shebang）。
+  信号与回测共用这一层；CLI：`python -m market_sniper.compute {list|signals|backtest}`。
+  新算法二选一：注册进 `SIGNAL_ALGOS`（进程内快路径）或只放 `compute/<algo>.py`（转发慢路径）。
+- **浏览器插件**：`extension/`（MV3，TradingView/Binance/Yahoo/雪球/长桥），只做标的识别+展示，
+  计算全在本地程序；标的映射规则在 `content.js toLocalCode()`。
+- **回测模型约定**：信号下一根开盘成交、双边手续费 fee_bps + 滑点 slippage_bps、
+  全仓（position_pct）、HK 只多 / US+CRYPTO 可空；引擎在 `compute/backtest.py`。
+- **启动自动补齐**：`config.backfill.on_start` 控制开启，增量（日K接续 + 分钟K刷最近窗口），在 GUI 线程外跑。
 
 ## 提交前检查
 

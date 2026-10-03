@@ -52,6 +52,14 @@ DEFAULTS: dict = {
         "flush_ms": 1000,
         "reconnect_max_sec": 30,
     },
+    "api": {
+        "port": 7132,                  # 本地 HTTP API（浏览器插件用）
+    },
+    "backfill": {
+        "on_start": True,              # 启动时后台自动补齐新数据
+        "days": 30,                    # 日K增量窗口（已有数据则自动接续）
+        "timeframes": ["1m", "5m", "15m", "30m", "60m"],
+    },
     "strategy": {
         "enabled": False,
         "params": {},                  # 留给算法自行解释
