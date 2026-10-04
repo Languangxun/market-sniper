@@ -5,3 +5,8 @@ logs/
 data/*.db*
 data/settings.json
 dist/
+data/raw/
+data/models/
+data/hk_industry.json
+data/models_hk.tar.gz
+data/reports/

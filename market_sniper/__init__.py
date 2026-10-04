@@ -8,5 +8,5 @@
 
 视图层：PyQt6 + pyqtgraph 蜡烛 + 副图。
 """
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 MARKETS = ("HK", "US", "CRYPTO")

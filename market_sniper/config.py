@@ -32,9 +32,10 @@ DEFAULTS: dict = {
         "timeout": 15,
     },
     "sources": {
-        # 各市场历史/延时数据源（HK/US 免费源延迟约15分钟；CRYPTO 为实时交易所）
-        "HK": "yfinance",
-        "US": "yfinance",
+        # 各市场数据源（HK/US 的实时报价可选 tencent 秒级 / yfinance 延时）
+        # 日K/分钟K 历史始终走 yfinance；CRYPTO 全走交易所
+        "HK": "tencent",
+        "US": "tencent",
         "CRYPTO": "binance",       # binance | okx | bybit | gate
     },
     "feed": {
@@ -59,10 +60,17 @@ DEFAULTS: dict = {
         "on_start": True,              # 启动时后台自动补齐新数据
         "days": 30,                    # 日K增量窗口（已有数据则自动接续）
         "timeframes": ["1m", "5m", "15m", "30m", "60m"],
+        "max_symbols": 200,            # 启动补齐标的数上限（0=不限；全市场池防狂刷）
     },
     "strategy": {
         "enabled": False,
         "params": {},                  # 留给算法自行解释
+    },
+    "lgbm": {
+        # 客户端默认不自动全量训练：随包/缓存注入模型，开箱即用。
+        # 开发端在 data/settings.json 打开 auto_retrain（增量≥N日后台重训）。
+        "auto_retrain": False,
+        "retrain_days": 5,             # 增量阈值（自然日）
     },
     "ui": {
         "default_market": "CRYPTO",

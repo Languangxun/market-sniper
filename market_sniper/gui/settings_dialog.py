@@ -15,8 +15,10 @@ _BACKENDS = (
 
 # 各市场可选数据源（key 与 config.sources 对应）
 _SOURCE_OPTIONS = {
-    "HK": (("yfinance", "Yahoo Finance（延迟约15分）"),),
-    "US": (("yfinance", "Yahoo Finance（延迟约15分）"),),
+    "HK": (("tencent", "腾讯实时（快）"),
+           ("yfinance", "Yahoo Finance（延时约15分）")),
+    "US": (("tencent", "腾讯实时（快）"),
+           ("yfinance", "Yahoo Finance（延时约15分）")),
     "CRYPTO": (("binance", "Binance"), ("okx", "OKX"),
                ("bybit", "Bybit"), ("gate", "Gate")),
 }
@@ -43,7 +45,7 @@ class SettingsDialog(QtWidgets.QDialog):
         data_w = QtWidgets.QWidget()
         dv = QtWidgets.QVBoxLayout(data_w)
 
-        src_box = QtWidgets.QGroupBox("历史/延时数据源（HK/US 免费源延迟约15分钟）")
+        src_box = QtWidgets.QGroupBox("数据源（HK/US 实时报价；历史K线固定走 Yahoo）")
         sf = QtWidgets.QFormLayout(src_box)
         self.src_combos: dict[str, QtWidgets.QComboBox] = {}
         for mkt in ("HK", "US", "CRYPTO"):
@@ -116,13 +118,18 @@ class SettingsDialog(QtWidgets.QDialog):
         self.reconnect_spin.setRange(5, 600)
         self.reconnect_spin.setSuffix(" 秒")
         ef.addRow("断线重连上限", self.reconnect_spin)
-        self.markers_chk = QtWidgets.QCheckBox("在 K 线叠加买卖点")
+        self.markers_chk = QtWidgets.QCheckBox("自动计算并显示图表买卖点")
         ef.addRow("", self.markers_chk)
         sep = QtWidgets.QFrame()
         sep.setFrameShape(QtWidgets.QFrame.Shape.HLine)
         ef.addRow(sep)
         self.autobf_chk = QtWidgets.QCheckBox("启动时后台自动补齐新数据")
         ef.addRow("", self.autobf_chk)
+        self.bf_max_spin = QtWidgets.QSpinBox()
+        self.bf_max_spin.setRange(0, 100000)
+        self.bf_max_spin.setSpecialValueText("不限")
+        self.bf_max_spin.setToolTip("候选池扩到全市场后限制启动补齐量，0 = 不限")
+        ef.addRow("启动补齐上限", self.bf_max_spin)
         self.api_port_spin = QtWidgets.QSpinBox()
         self.api_port_spin.setRange(1024, 65535)
         self.api_port_spin.setToolTip("浏览器插件读取买卖点的本地端口")
@@ -136,12 +143,24 @@ class SettingsDialog(QtWidgets.QDialog):
         self.algo_combo = QtWidgets.QComboBox()
         from market_sniper import signals as sig_mod
         from market_sniper import compute as compute_mod
+        algo_labels = {"lgbm": "LightGBM（港股，日线/分时自动）"}
         algos = list(sig_mod.SIGNAL_ALGOS) + [
             s for s in compute_mod.list_scripts() if s not in sig_mod.SIGNAL_ALGOS]
         for a in algos or ["boll_atr"]:
-            self.algo_combo.addItem(a, a)
+            self.algo_combo.addItem(algo_labels.get(a, a), a)
         form.addRow("图表信号算法", self.algo_combo)
         sv.addLayout(form)
+        self.lgbm_auto_chk = QtWidgets.QCheckBox("港股 LightGBM 增量自动重训（后台，前台先用旧模型）")
+        sv.addWidget(self.lgbm_auto_chk)
+        self.lgbm_days_spin = QtWidgets.QSpinBox()
+        self.lgbm_days_spin.setRange(1, 90)
+        self.lgbm_days_spin.setSuffix(" 天")
+        self.lgbm_days_spin.setToolTip("本地数据领先上次训练超过该天数时触发后台重训")
+        row = QtWidgets.QHBoxLayout()
+        row.addWidget(QtWidgets.QLabel("重训增量阈值"))
+        row.addWidget(self.lgbm_days_spin)
+        row.addStretch(1)
+        sv.addLayout(row)
         self.strategy_chk = QtWidgets.QCheckBox("实时引擎启用策略（逐笔失衡示例）")
         sv.addWidget(self.strategy_chk)
         hint = QtWidgets.QLabel(
@@ -194,6 +213,9 @@ class SettingsDialog(QtWidgets.QDialog):
         idx = self.algo_combo.findData(c.get("ui.signal_algo", "boll_atr"))
         self.algo_combo.setCurrentIndex(max(0, idx))
         self.autobf_chk.setChecked(bool(c.get("backfill.on_start", True)))
+        self.bf_max_spin.setValue(int(c.get("backfill.max_symbols", 200) or 0))
+        self.lgbm_auto_chk.setChecked(bool(c.get("lgbm.auto_retrain", True)))
+        self.lgbm_days_spin.setValue(int(c.get("lgbm.retrain_days", 5) or 5))
         self.api_port_spin.setValue(int(c.get("api.port", 7132)))
 
         self.strategy_chk.setChecked(bool(c.get("strategy.enabled", False)))
@@ -258,6 +280,11 @@ class SettingsDialog(QtWidgets.QDialog):
             },
             "backfill": {
                 "on_start": self.autobf_chk.isChecked(),
+                "max_symbols": self.bf_max_spin.value(),
+            },
+            "lgbm": {
+                "auto_retrain": self.lgbm_auto_chk.isChecked(),
+                "retrain_days": self.lgbm_days_spin.value(),
             },
             "api": {
                 "port": self.api_port_spin.value(),

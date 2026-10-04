@@ -173,9 +173,9 @@ class MainWindow(QtWidgets.QMainWindow):
             from market_sniper import api as api_mod
             self._api_port = api_mod.start()
             self.sb_api.setText(f"API 127.0.0.1:{self._api_port}"
-                                if self._api_port else "API ✗ 端口占用")
+                                if self._api_port else "API 端口占用")
         except Exception as e:
-            self.sb_api.setText("API ✗")
+            self.sb_api.setText("API 未启动")
             self._log(f"API 启动失败: {e}")
 
         # 启动时后台自动补齐新数据
@@ -184,16 +184,27 @@ class MainWindow(QtWidgets.QMainWindow):
                              name="auto-backfill").start()
 
     def _auto_backfill(self):
-        """启动后台增量补齐：日K接续 + 各档分钟K刷最近窗口。"""
+        """启动后台增量补齐：日K接续 + 各档分钟K刷最近窗口（受 max_symbols 限制）。"""
         try:
             days = int(self.config.get("backfill.days", 30))
             tfs = self.config.get("backfill.timeframes") or \
                 ["1m", "5m", "15m", "30m", "60m"]
-            self._sig_log.emit("后台自动补齐新数据…")
+            max_n = int(self.config.get("backfill.max_symbols", 200) or 0)
+            self._sig_log.emit(f"后台自动补齐新数据（上限 {max_n or '不限'}）…")
+            markets = ["HK", "US", "CRYPTO"]
+            if self._current_market in markets:
+                markets.remove(self._current_market)
+                markets.insert(0, self._current_market)
             n = 0
-            for m in ("HK", "US", "CRYPTO"):
+            done = 0
+            stopped = False
+            for m in markets:
                 for code, _ in fetcher.universes(m):
+                    if max_n and done >= max_n:
+                        stopped = True
+                        break
                     local = f"{m}:{code}"
+                    done += 1
                     try:
                         n += fetcher.backfill_daily(local, days=days)
                     except Exception as e:
@@ -206,7 +217,10 @@ class MainWindow(QtWidgets.QMainWindow):
                         except Exception:
                             pass
                         time.sleep(0.15)
-            self._sig_log.emit(f"后台自动补齐完成（+{n} 根）")
+                if stopped:
+                    break
+            tip = f"，已达上限 {max_n}（设置可调）" if stopped else ""
+            self._sig_log.emit(f"后台自动补齐完成（+{n} 根）{tip}")
             self._sig_backfill_done.emit(f"自动补齐完成 +{n} 根")
         except Exception:
             log = logging.getLogger("market_sniper.gui")
@@ -369,7 +383,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # 折叠副图
         self.fold_btn = QtWidgets.QToolButton()
-        self.fold_btn.setText("📐 折叠副图")
+        self.fold_btn.setText("折叠副图")
         self.fold_btn.setCheckable(True)
         self.fold_btn.toggled.connect(self._on_fold_toggle)
         tb.addWidget(self.fold_btn)
@@ -377,38 +391,31 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # 功能按钮
         self.btn_analyze = QtWidgets.QToolButton()
-        self.btn_analyze.setText("🔍 分析")
+        self.btn_analyze.setText("分析")
         self.btn_analyze.clicked.connect(self._on_analyze)
         tb.addWidget(self.btn_analyze)
 
         self.btn_refresh = QtWidgets.QToolButton()
-        self.btn_refresh.setText("🔄 刷新")
+        self.btn_refresh.setText("刷新")
         self.btn_refresh.clicked.connect(self._after_symbol_changed)
         tb.addWidget(self.btn_refresh)
 
         self.btn_backfill = QtWidgets.QToolButton()
-        self.btn_backfill.setText("📥 回填")
+        self.btn_backfill.setText("回填")
         self.btn_backfill.clicked.connect(self._on_backfill)
         tb.addWidget(self.btn_backfill)
 
         self.btn_tools = QtWidgets.QToolButton()
-        self.btn_tools.setText("⚙ 设置")
+        self.btn_tools.setText("设置")
         self.btn_tools.clicked.connect(self._open_settings)
         tb.addWidget(self.btn_tools)
 
         self.btn_live = QtWidgets.QToolButton()
-        self.btn_live.setText("● 实时")
+        self.btn_live.setText("实时")
         self.btn_live.setCheckable(True)
         self.btn_live.setToolTip("启动/停止实时行情引擎（数据源见设置）")
         self.btn_live.toggled.connect(self._on_live_toggle)
         tb.addWidget(self.btn_live)
-
-        self.btn_sig = QtWidgets.QToolButton()
-        self.btn_sig.setText("⚡ 信号")
-        self.btn_sig.setCheckable(True)
-        self.btn_sig.setToolTip("在当前图表上计算买卖点（算法见 ⚙ 设置 → 策略）")
-        self.btn_sig.toggled.connect(self._on_sig_toggle)
-        tb.addWidget(self.btn_sig)
 
     # ---------------- 信息行（股票信息 / 进度 / hover） ----------------
     def _build_info_row(self):
@@ -563,7 +570,7 @@ class MainWindow(QtWidgets.QMainWindow):
         rv.addWidget(self.ind_label, 1)
 
         # 市场状态条
-        self.phase_var = QtWidgets.QLabel("市场状态 ● -")
+        self.phase_var = QtWidgets.QLabel("市场状态 -")
         self.phase_var.setObjectName("accent")
         self.phase_var.setStyleSheet(
             f"color:{ACCENT}; font-weight:bold; padding:2px 0;"
@@ -623,7 +630,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.sb = self.statusBar()
         self.sb_msg = QtWidgets.QLabel("就绪")
         self.sb.addPermanentWidget(self.sb_msg, 1)
-        self.sb_feed = QtWidgets.QLabel("实时: ○ 停止")
+        self.sb_feed = QtWidgets.QLabel("实时: 停止")
         self.sb_feed.setStyleSheet(f"color:{AXIS_C};")
         self.sb.addPermanentWidget(self.sb_feed)
         self.sb_api = QtWidgets.QLabel("API …")
@@ -815,10 +822,10 @@ class MainWindow(QtWidgets.QMainWindow):
                             n_rows += fetcher.backfill_minute(local, timeframe=tf,
                                                               bars=bars)
                         n_ok += 1
-                        self._sig_log.emit(f"  ✓ {local}")
+                        self._sig_log.emit(f"  完成 {local}")
                     except Exception as e:
                         n_fail += 1
-                        self._sig_log.emit(f"  ✗ {local}: {e}")
+                        self._sig_log.emit(f"  失败 {local}: {e}")
                 summary = (f"回填完成：{n_ok} 成功 / {n_fail} 失败，"
                            f"共 +{n_rows} 根")
             except Exception as e:
@@ -839,13 +846,15 @@ class MainWindow(QtWidgets.QMainWindow):
         dlg = SettingsDialog(self.config, qss=self._qss(), parent=self)
         if not dlg.exec():
             return
-        self._log("设置已保存 → data/settings.json")
+        self._log("设置已保存: data/settings.json")
         try:
-            from market_sniper.data.sources import ccxt_crypto, yfinance_us
+            from market_sniper.data.sources import ccxt_crypto, tencent_hk_us, yfinance_us
             ccxt_crypto.reset_exchanges()
             yfinance_us.reset_session()
+            tencent_hk_us.reset_session()
         except Exception:
             pass
+        self._refresh_signals()
         # API 端口变了就热重启
         try:
             from market_sniper import api as api_mod
@@ -854,7 +863,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 api_mod.stop()
                 self._api_port = api_mod.start(port)
                 self.sb_api.setText(f"API 127.0.0.1:{self._api_port}"
-                                    if self._api_port else "API ✗ 端口占用")
+                                    if self._api_port else "API 端口占用")
         except Exception as e:
             self._log(f"API 重启失败: {e}")
         if self._engine is not None and self._engine.running:
@@ -916,7 +925,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if len(self._engine_signals) > 500:
             self._engine_signals = self._engine_signals[-500:]
         meta = ACTION_META.get(d.get("side"), {})
-        self._log(f"⚡ {meta.get('label', d.get('side', '?'))} "
+        self._log(f"{meta.get('label', d.get('side', '?'))} "
                   f"{d['local']} @ {d['price']:.4f}"
                   f" · {d.get('strategy', '')} {d.get('reason', '')}")
         self._apply_markers()
@@ -927,20 +936,21 @@ class MainWindow(QtWidgets.QMainWindow):
             last = (time.strftime("%H:%M:%S", time.localtime(st["last_ts_ms"] / 1000))
                     if st["last_ts_ms"] else "-")
             self.sb_feed.setText(
-                f"实时 ● {st['feed']} · tick {st['ticks']} · 信号 {st['signals']}"
+                f"实时 {st['feed']} · tick {st['ticks']} · 信号 {st['signals']}"
                 f" · 最新 {last}")
             self.sb_feed.setStyleSheet(f"color:{ACCENT};")
         else:
-            self.sb_feed.setText("实时: ○ 停止")
+            self.sb_feed.setText("实时: 停止")
             self.sb_feed.setStyleSheet(f"color:{AXIS_C};")
 
-    def _on_sig_toggle(self, checked: bool):
-        if not checked:
-            self._chart_signals = []
-            self._apply_markers()
+    def _refresh_signals(self):
+        """图表加载后自动计算买卖点；由 ui.show_markers 控制显示。"""
+        if not getattr(self, "_last_bars", None):
             return
-        if getattr(self, "_last_bars", None):
+        if self.config.get("ui.show_markers", True):
             self._compute_chart_signals()
+        else:
+            self._chart_signals = []
         self._apply_markers()
 
     def _compute_chart_signals(self):
@@ -1123,9 +1133,7 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         self._last_bars = bars
         self.kline.set_data(data)
-        if self.btn_sig.isChecked():
-            self._compute_chart_signals()
-        self._apply_markers()
+        self._refresh_signals()
         self._refresh_quote_box(ind, name)
         self._update_info()
         self.sb_msg.setText(
@@ -1206,9 +1214,7 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         self.kline.set_data(data)
         self.kline.set_subplot(self._subplot)
-        if self.btn_sig.isChecked():
-            self._compute_chart_signals()
-        self._apply_markers()
+        self._refresh_signals()
         self._refresh_quote_box(ind, name)
         self._update_info()
         self.sb_msg.setText(
@@ -1321,11 +1327,11 @@ class MainWindow(QtWidgets.QMainWindow):
         # 简单按本机时间估
         h = datetime.datetime.now().hour
         if 9 <= h < 12 or 13 <= h < 15:
-            self.phase_var.setText("市场状态 ●  交易中")
+            self.phase_var.setText("市场状态  交易中")
         elif 12 <= h < 13:
-            self.phase_var.setText("市场状态 ●  午间休市")
+            self.phase_var.setText("市场状态  午间休市")
         else:
-            self.phase_var.setText("市场状态 ●  盘后")
+            self.phase_var.setText("市场状态  盘后")
 
     def _refresh_indices(self):
         """后台线程串行查 5 个指数（HTTP 较慢，不能阻塞 UI）。"""
@@ -1372,8 +1378,8 @@ class MainWindow(QtWidgets.QMainWindow):
             f"· 数据源：HK/US/CRYPTO 全部在线<br/>"
             f"· 工作时间：crypto 24×7；HK 09:30-16:00；<br/>"
             f"  US 21:30-04:00（冬令时 22:30-05:00）<br/>"
-            f"· ⚙ 设置：数据源/代理/引擎参数<br/>"
-            f"· ● 实时：Mock 离线联调 / Binance WS<br/>"
+            f"· 设置：数据源/代理/引擎参数<br/>"
+            f"· 实时：Mock 离线联调 / Binance WS<br/>"
             f"· F11 全屏 · Esc 退出<br/>"
             f"</div>"
         )

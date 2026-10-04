@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "market-sniper 买卖点",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "连接本地 market-sniper 桌面程序，在 TradingView / Binance / Yahoo财经 / 雪球 的K线页面上叠加买卖点（示例算法 BOLL+ATR）。",
   "permissions": ["storage"],
   "host_permissions": [

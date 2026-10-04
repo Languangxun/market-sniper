@@ -8,3 +8,4 @@ PyQt6>=6.6
 pyqtgraph>=0.13
 curl_cffi>=0.7
 websockets>=14
+lightgbm>=4.0

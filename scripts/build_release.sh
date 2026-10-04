@@ -16,6 +16,10 @@ mkdir -p "$STAGE"
 cp -r market_sniper compute scripts main.py run.sh install.sh \
       requirements.txt README.md LICENSE AGENTS.md "$STAGE/"
 mkdir -p "$STAGE/data" "$STAGE/logs"
+if [ -f data/models/hk/daily/index.json ] && [ -f data/models/hk/intraday/index.json ]; then
+  echo "==> 注入 LightGBM 模型缓存"
+  python3 scripts/pack_lgbm_cache.py --out "$STAGE/data/models_hk.tar.gz"
+fi
 find "$STAGE" -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null || true
 find "$STAGE" -name "*.pyc" -delete
 tar -C "$(dirname "$STAGE")" -czf \

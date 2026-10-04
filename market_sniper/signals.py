@@ -150,3 +150,12 @@ def compute_boll_atr(bars: dict, *, n: int = 20, k: float = 2.0,
 
 
 SIGNAL_ALGOS["boll_atr"] = compute_boll_atr
+
+
+def compute_lgbm(bars: dict, market: str = "HK", **params) -> dict:
+    """LightGBM 买卖点（港股；日线/分时自动选对应模型）。"""
+    from market_sniper.lgbm_model import run_algo
+    return run_algo(bars, market=market, **params)
+
+
+SIGNAL_ALGOS["lgbm"] = compute_lgbm

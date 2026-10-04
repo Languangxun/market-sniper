@@ -17,9 +17,10 @@ import datetime
 import logging
 import time
 
+from market_sniper import config as config_mod
 from market_sniper import symbols as sym
 from market_sniper.data import db
-from market_sniper.data.sources import ccxt_crypto, yfinance_us
+from market_sniper.data.sources import ccxt_crypto, tencent_hk_us, yfinance_us
 
 _cc = ccxt_crypto
 
@@ -126,6 +127,11 @@ def _route_minute(code: str, market: str, *, interval: str, period: str):
 
 
 def _route_quote(code: str, market: str):
+    if market in ("HK", "US"):
+        src = str(config_mod.get_config().get(f"sources.{market}",
+                                              "yfinance")).lower()
+        if src in ("tencent", "tq", "qq"):
+            return tencent_hk_us.fetch_quote(market, code)
     if market == "HK":
         return yfinance_us.fetch_quote(sym.yf_symbol(f"HK:{code}"))
     if market == "US":
